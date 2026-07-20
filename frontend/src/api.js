@@ -1,9 +1,12 @@
 const getFullUrl = (endpoint) => {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  if (window.location.port === '5173') {
-    return `http://${window.location.hostname}:5000/api${cleanEndpoint}`;
+  let clean = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (!clean.startsWith('/api')) {
+    clean = `/api${clean}`;
   }
-  return `/api${cleanEndpoint}`;
+  if (window.location.port === '5173') {
+    return `http://${window.location.hostname}:5000${clean}`;
+  }
+  return clean;
 };
 
 export const getHeaders = () => {
