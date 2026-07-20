@@ -2,66 +2,16 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-let mysql;
-try {
-  mysql = require('mysql2');
-} catch (e) {
-  mysql = null;
-}
+const dbPath = path.resolve(__dirname, '../database.sqlite');
+const dbInstance = new sqlite3.Database(dbPath);
 
-let USE_MYSQL = process.env.DB_TYPE === 'mysql' && mysql;
-
-let dbInstance = null;
-let mysqlPool = null;
-
-const initSqlite = () => {
-  if (!dbInstance) {
-    const dbPath = path.resolve(__dirname, '../database.sqlite');
-    dbInstance = new sqlite3.Database(dbPath);
-  }
-};
-
-try {
-  if (USE_MYSQL) {
-    console.log('Инициализация подключения к СУБД MySQL / MariaDB...');
-    mysqlPool = mysql.createPool({
-      host: process.env.DB_HOST || '127.0.0.1',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'alany_host',
-      waitForConnections: true,
-      connectionLimit: 20,
-      queueLimit: 0
-    });
-    mysqlPool.on('error', (err) => {
-      console.error('MySQL Error Event, using fallback SQLite:', err.message);
-    });
-  }
-  initSqlite();
-} catch (e) {
-  console.error('Ошибка инициализации MySQL, включен SQLite fallback:', e.message);
-  USE_MYSQL = false;
-  initSqlite();
-}
-
-// Адаптер вызовов к БД (универсален для SQLite и MySQL с автоматическим fallback)
 const db = {
   get: (sql, params, callback) => {
     if (typeof params === 'function') {
       callback = params;
       params = [];
     }
-    if (USE_MYSQL && mysqlPool) {
-      mysqlPool.query(sql, params, (err, results) => {
-        if (err) {
-          return dbInstance.get(sql, params, callback);
-        }
-        const row = results && results.length > 0 ? results[0] : null;
-        if (callback) callback(null, row);
-      });
-    } else {
-      dbInstance.get(sql, params, callback);
-    }
+    dbInstance.get(sql, params, callback);
   },
 
   all: (sql, params, callback) => {
@@ -69,16 +19,7 @@ const db = {
       callback = params;
       params = [];
     }
-    if (USE_MYSQL && mysqlPool) {
-      mysqlPool.query(sql, params, (err, results) => {
-        if (err) {
-          return dbInstance.all(sql, params, callback);
-        }
-        if (callback) callback(null, results || []);
-      });
-    } else {
-      dbInstance.all(sql, params, callback);
-    }
+    dbInstance.all(sql, params, callback);
   },
 
   run: function(sql, params, callback) {
@@ -86,38 +27,21 @@ const db = {
       callback = params;
       params = [];
     }
-    if (USE_MYSQL && mysqlPool) {
-      let formattedSql = sql.replace(/AUTOINCREMENT/gi, 'AUTO_INCREMENT');
-      mysqlPool.query(formattedSql, params, function(err, results) {
-        if (err) {
-          return dbInstance.run(sql, params, callback);
-        }
-        const context = { lastID: results ? results.insertId : 0, changes: results ? results.affectedRows : 0 };
-        if (callback) callback.call(context, null);
-      });
-    } else {
-      dbInstance.run(sql, params, function(err) {
-        if (callback) callback.call(this, err);
-      });
-    }
+    dbInstance.run(sql, params, function(err) {
+      if (callback) callback.call(this, err);
+    });
   },
 
   serialize: (callback) => {
-    if (USE_MYSQL) {
-      if (callback) callback();
-    } else {
-      dbInstance.serialize(callback);
-    }
+    dbInstance.serialize(callback);
   }
 };
 
 // Инициализация таблиц базы данных
 const initDatabase = () => {
-  const isMysql = USE_MYSQL;
-
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       username VARCHAR(255) UNIQUE NOT NULL,
       email VARCHAR(255) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
@@ -131,7 +55,7 @@ const initDatabase = () => {
 
   const createServersTable = `
     CREATE TABLE IF NOT EXISTS servers (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INT NOT NULL,
       game_type VARCHAR(100) NOT NULL,
       name VARCHAR(255) NOT NULL,
@@ -150,7 +74,7 @@ const initDatabase = () => {
 
   const createServerFilesTable = `
     CREATE TABLE IF NOT EXISTS server_files (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id INT NOT NULL,
       filepath VARCHAR(500) NOT NULL,
       content LONGTEXT NOT NULL,
@@ -160,7 +84,7 @@ const initDatabase = () => {
 
   const createTicketsTable = `
     CREATE TABLE IF NOT EXISTS tickets (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INT NOT NULL,
       subject VARCHAR(255) NOT NULL,
       status VARCHAR(50) DEFAULT 'open',
@@ -170,7 +94,7 @@ const initDatabase = () => {
 
   const createTicketMessagesTable = `
     CREATE TABLE IF NOT EXISTS ticket_messages (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       ticket_id INT NOT NULL,
       sender_id INT NOT NULL,
       message LONGTEXT NOT NULL,
@@ -181,7 +105,7 @@ const initDatabase = () => {
 
   const createTransactionsTable = `
     CREATE TABLE IF NOT EXISTS transactions (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INT NOT NULL,
       amount REAL NOT NULL,
       type VARCHAR(50) NOT NULL,
@@ -192,7 +116,7 @@ const initDatabase = () => {
 
   const createPromocodesTable = `
     CREATE TABLE IF NOT EXISTS promocodes (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       code VARCHAR(100) UNIQUE NOT NULL,
       amount REAL NOT NULL,
       uses_count INT DEFAULT 0,
@@ -203,7 +127,7 @@ const initDatabase = () => {
 
   const createWebhostsTable = `
     CREATE TABLE IF NOT EXISTS webhosts (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INT NOT NULL,
       domain VARCHAR(255) NOT NULL,
       tarif VARCHAR(100) NOT NULL,
@@ -220,7 +144,7 @@ const initDatabase = () => {
 
   const createNodesTable = `
     CREATE TABLE IF NOT EXISTS nodes (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       name VARCHAR(255) NOT NULL,
       location VARCHAR(255) NOT NULL,
       ip_address VARCHAR(100) NOT NULL,
@@ -234,7 +158,7 @@ const initDatabase = () => {
 
   const createServerDatabasesTable = `
     CREATE TABLE IF NOT EXISTS server_databases (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id INT NOT NULL,
       name VARCHAR(255) NOT NULL,
       user VARCHAR(255) NOT NULL,
@@ -246,7 +170,7 @@ const initDatabase = () => {
 
   const createServerBackupsTable = `
     CREATE TABLE IF NOT EXISTS server_backups (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id INT NOT NULL,
       filename VARCHAR(255) NOT NULL,
       size VARCHAR(100) NOT NULL,
@@ -256,7 +180,7 @@ const initDatabase = () => {
 
   const createServerTasksTable = `
     CREATE TABLE IF NOT EXISTS server_tasks (
-      id ${isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id INT NOT NULL,
       name VARCHAR(255) NOT NULL,
       action VARCHAR(100) NOT NULL,
@@ -280,7 +204,7 @@ const initDatabase = () => {
   db.run(createServerBackupsTable);
   db.run(createServerTasksTable);
 
-  // Первичная инициализация админа и стартовых нод
+  // Инициализация администраторов и тестовых пользователей
   setTimeout(() => {
     db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
       if (!err && row && (row.count === 0 || row.count === '0')) {
@@ -313,7 +237,7 @@ const initDatabase = () => {
         );
       }
     });
-  }, 1000);
+  }, 500);
 };
 
 initDatabase();
