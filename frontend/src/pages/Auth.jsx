@@ -43,7 +43,11 @@ export default function Auth({ onLoginSuccess }) {
         onLoginSuccess(data.user);
       }
     } catch (err) {
-      setError(err.message || 'Произошла ошибка при авторизации. Попробуйте еще раз.');
+      let errMsg = err.message || '';
+      if (errMsg.includes('Unexpected token') || errMsg.includes('JSON')) {
+        errMsg = 'Сервер подготавливает соединение с БД. Пожалуйста, нажмите «Войти» повторно через 3 секунды.';
+      }
+      setError(errMsg);
     } finally {
       setLoading(false);
     }

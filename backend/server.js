@@ -31,6 +31,7 @@ app.use((req, res, next) => {
 });
 
 // Регистрация API-маршрутов
+app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', authRoutes);
 app.use('/api/billing', billingRoutes);
