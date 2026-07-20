@@ -104,16 +104,14 @@ server {
     server_name cloud.alany.ru;
 
     root /var/www/alany-host/frontend/dist;
-    index index.html index.php;
+    index index.html;
 
     client_max_body_size 100M;
 
-    # Главная панель Alany Host
     location / {
         try_files $uri $uri/ /index.html;
     }
 
-    # API Бэкенда Node.js
     location /api {
         proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
@@ -123,34 +121,6 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    # Страховка для прямой авторизации без /api
-    location /auth/ {
-        proxy_pass http://127.0.0.1:5000/api/auth/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    # Управление базами данных phpMyAdmin
-    location /phpmyadmin {
-        root /usr/share/;
-        index index.php index.html index.htm;
-        location ~ \.php$ {
-            try_files $uri =404;
-            fastcgi_split_path_info ^(.+\.php)(/.+)$;
-            fastcgi_pass unix:/run/php/php-fpm.sock;
-            fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            include fastcgi_params;
-        }
-    }
-
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        expires max;
-        log_not_found off;
     }
 }
 EOF
