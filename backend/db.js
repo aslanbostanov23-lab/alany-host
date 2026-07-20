@@ -41,17 +41,18 @@ try {
   initSqlite();
 }
 
-// Адаптер вызовов к БД (универсален для SQLite и MySQL)
+// Адаптер вызовов к БД (универсален для SQLite и MySQL с автоматическим fallback)
 const db = {
   get: (sql, params, callback) => {
     if (typeof params === 'function') {
       callback = params;
       params = [];
     }
-    if (USE_MYSQL) {
-      // Преобразуем SQLite синтаксис ? в MySQL
+    if (USE_MYSQL && mysqlPool) {
       mysqlPool.query(sql, params, (err, results) => {
-        if (err) return callback ? callback(err, null) : null;
+        if (err) {
+          return dbInstance.get(sql, params, callback);
+        }
         const row = results && results.length > 0 ? results[0] : null;
         if (callback) callback(null, row);
       });
@@ -65,9 +66,11 @@ const db = {
       callback = params;
       params = [];
     }
-    if (USE_MYSQL) {
+    if (USE_MYSQL && mysqlPool) {
       mysqlPool.query(sql, params, (err, results) => {
-        if (err) return callback ? callback(err, null) : null;
+        if (err) {
+          return dbInstance.all(sql, params, callback);
+        }
         if (callback) callback(null, results || []);
       });
     } else {
@@ -80,11 +83,12 @@ const db = {
       callback = params;
       params = [];
     }
-    if (USE_MYSQL) {
-      // Замена специфичных SQLite операторов если нужно
+    if (USE_MYSQL && mysqlPool) {
       let formattedSql = sql.replace(/AUTOINCREMENT/gi, 'AUTO_INCREMENT');
       mysqlPool.query(formattedSql, params, function(err, results) {
-        if (err) return callback ? callback(err) : null;
+        if (err) {
+          return dbInstance.run(sql, params, callback);
+        }
         const context = { lastID: results ? results.insertId : 0, changes: results ? results.affectedRows : 0 };
         if (callback) callback.call(context, null);
       });
