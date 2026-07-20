@@ -775,6 +775,10 @@ router.delete('/:id/tasks/:taskId', authenticateToken, (req, res) => {
   const { taskId } = req.params;
   db.run(`DELETE FROM server_tasks WHERE id = ?`, [taskId], (err) => {
     if (err) return res.status(500).json({ message: 'Ошибка удаления задачи' });
+    res.json({ message: 'Задача удалена' });
+  });
+});
+
 // 13. Автоустановка модов и фреймворков (EXILED SCP, Samp Diamond/Arizona)
 router.post('/:id/install-mod', authenticateToken, (req, res) => {
   const { modId } = req.body;
@@ -799,3 +803,4 @@ router.post('/:id/install-mod', authenticateToken, (req, res) => {
 });
 
 module.exports = router;
+
