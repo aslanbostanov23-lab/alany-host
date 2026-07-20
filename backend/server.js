@@ -44,17 +44,17 @@ app.use('/api', servicesRoutes);
 const distPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(distPath));
 
+// Явный JSON-ответ на любые отсутствующие API маршруты (гарантирует отсутствие HTML ответов)
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ message: `Метод API ${req.originalUrl} не найден` });
+});
+
 app.get('*', (req, res) => {
-  // Если запрос не к API, отправляем index.html фронтенда
-  if (!req.url.startsWith('/api')) {
-    res.sendFile(path.join(distPath, 'index.html'), (err) => {
-      if (err) {
-        res.status(200).send('Бэкенд Alany Host работает! Фронтенд еще не собран. Запустите в режиме разработки (npm run dev).');
-      }
-    });
-  } else {
-    res.status(404).json({ message: 'Метод API не найден' });
-  }
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(200).send('Бэкенд Alany Host работает! Соберите фронтенд: npm run build');
+    }
+  });
 });
 
 // Запуск сервера
