@@ -125,6 +125,8 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
     location /phpmyadmin {
         root /usr/share/;
         index index.php index.html index.htm;
@@ -137,6 +139,9 @@ server {
             fastcgi_param HTTPS on;
             fastcgi_param HTTP_SCHEME https;
             include fastcgi_params;
+        }
+        location ~* ^/phpmyadmin/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+            root /usr/share/;
         }
     }
 }
