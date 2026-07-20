@@ -128,20 +128,17 @@ server {
     }
 
     location /phpmyadmin {
-        root /usr/share/;
+        alias /usr/share/phpmyadmin/;
         index index.php index.html index.htm;
         location ~ \.php$ {
             try_files $uri =404;
             fastcgi_split_path_info ^(.+\.php)(/.+)$;
             fastcgi_pass unix:/run/php/php-fpm.sock;
             fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
             fastcgi_param HTTPS on;
             fastcgi_param HTTP_SCHEME https;
             include fastcgi_params;
-        }
-        location ~* ^/phpmyadmin/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
-            root /usr/share/;
         }
     }
 }
