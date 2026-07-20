@@ -152,6 +152,7 @@ export default function Auth({ onLoginSuccess }) {
                 onChange={handleInputChange}
                 placeholder="Введите пароль"
                 className="form-input"
+                autoComplete="current-password"
                 required
                 style={styles.paddedInput}
               />
