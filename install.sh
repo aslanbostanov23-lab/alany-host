@@ -125,6 +125,15 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
+    # Страховка для прямой авторизации без /api
+    location /auth/ {
+        proxy_pass http://127.0.0.1:5000/api/auth/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
     # Управление базами данных phpMyAdmin
     location /phpmyadmin {
         root /usr/share/;
