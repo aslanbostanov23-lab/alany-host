@@ -52,13 +52,13 @@ npm install -g pm2
 
 # 4. Настройка MariaDB / MySQL & phpMyAdmin
 echo -e "${YELLOW}[3/7] Конфигурация MySQL (MariaDB) для панели и phpMyAdmin...${NC}"
-systemctl start mariadb || true
-systemctl enable mariadb || true
+systemctl start mariadb || systemctl start mysql || true
+systemctl enable mariadb || systemctl enable mysql || true
 
-mysql -e "CREATE DATABASE IF NOT EXISTS alany_host CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -e "CREATE USER IF NOT EXISTS 'alany_user'@'localhost' IDENTIFIED BY 'AlanyHost2026Pass!';"
-mysql -e "GRANT ALL PRIVILEGES ON alany_host.* TO 'alany_user'@'localhost';"
-mysql -e "FLUSH PRIVILEGES;"
+mysql -e "CREATE DATABASE IF NOT EXISTS alany_host CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || true
+mysql -e "CREATE USER IF NOT EXISTS 'alany_user'@'localhost' IDENTIFIED BY 'AlanyHost2026Pass!';" || true
+mysql -e "GRANT ALL PRIVILEGES ON alany_host.* TO 'alany_user'@'localhost';" || true
+mysql -e "FLUSH PRIVILEGES;" || true
 
 export DEBIAN_FRONTEND=noninteractive
 echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | debconf-set-selections

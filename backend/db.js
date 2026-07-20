@@ -33,6 +33,9 @@ try {
       connectionLimit: 20,
       queueLimit: 0
     });
+    mysqlPool.on('error', (err) => {
+      console.error('MySQL Error Event, using fallback SQLite:', err.message);
+    });
   }
   initSqlite();
 } catch (e) {
