@@ -155,9 +155,12 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/alany-host /etc/nginx/sites-enabled/default
-# 7. Автоматический выпуск бесплатного SSL-сертификата HTTPS (Let's Encrypt)
-echo -e "${YELLOW}[6/7] Автоматический выпуск SSL-сертификата HTTPS для ${DOMAIN}...${NC}"
+rm -f /etc/nginx/sites-enabled/*
+rm -f /etc/nginx/sites-available/default
+ln -sf /etc/nginx/sites-available/alany-host /etc/nginx/sites-enabled/alany-host
+nginx -t || true
+systemctl restart nginx || true
+systemctl restart php*-fpm || true
 if command -v certbot &> /dev/null; then
   certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email -d "${DOMAIN}" || {
     echo -e "${YELLOW}[ИНФО] Если домен ${DOMAIN} еще не направлен на этот IP, SSL активируется автоматически при привязке A-записи.${NC}"
