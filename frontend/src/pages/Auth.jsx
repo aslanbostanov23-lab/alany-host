@@ -96,6 +96,7 @@ export default function Auth({ onLoginSuccess }) {
                     onChange={handleInputChange}
                     placeholder="Введите имя пользователя или email"
                     className="form-input"
+                    autoComplete="username"
                     required
                     style={styles.paddedInput}
                   />
