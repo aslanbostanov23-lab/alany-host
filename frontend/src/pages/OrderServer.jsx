@@ -56,9 +56,29 @@ export default function OrderServer({ user, onOrderSuccess, setCurrentPage }) {
   const [serverName, setServerName] = useState('My Minecraft Server');
   const [duration, setDuration] = useState(30);
 
+  // Ноды
+  const [nodes, setNodes] = useState([]);
+  const [selectedNodeId, setSelectedNodeId] = useState(1);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    fetchNodes();
+  }, []);
+
+  const fetchNodes = async () => {
+    try {
+      const data = await api.get('/system/status');
+      if (data && data.nodes) {
+        setNodes(data.nodes);
+        if (data.nodes[0]) setSelectedNodeId(data.nodes[0].id || 1);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Обновление при смене игры
   const handleGameSelect = (gameId) => {
@@ -101,7 +121,8 @@ export default function OrderServer({ user, onOrderSuccess, setCurrentPage }) {
         cpu_cores: currentPlan.cpu,
         disk_gb: currentPlan.disk,
         slots: currentPlan.slots,
-        duration_days: duration
+        duration_days: duration,
+        node_id: selectedNodeId
       });
 
       setSuccess(true);
@@ -180,9 +201,46 @@ export default function OrderServer({ user, onOrderSuccess, setCurrentPage }) {
               </div>
             </div>
 
+            {/* Выбор серверной ноды локации */}
+            <div className="card">
+              <h3 style={st.cardHeading}>2. Выберите KVM-ноду (Серверная локация)</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+                {nodes.map((n, idx) => {
+                  const nodeId = n.id || idx + 1;
+                  const isSelected = selectedNodeId === nodeId;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setSelectedNodeId(nodeId)}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: isSelected ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                        border: `2px solid ${isSelected ? '#38bdf8' : 'var(--border-color)'}`,
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: isSelected ? '0 0 15px rgba(56, 189, 248, 0.15)' : 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <Zap size={16} color={isSelected ? '#38bdf8' : 'var(--text-secondary)'} />
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '0.85rem' }}>{n.name}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Сеть: <span style={{ color: 'var(--status-success)', fontWeight: 'bold' }}>10 Gbps (DDoS-Guard)</span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                        Пинг по СНГ: <strong style={{ color: '#38bdf8' }}>~12-18 мс</strong>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Выбор фиксированного тарифа */}
             <div className="card">
-              <h3 style={st.cardHeading}>2. Выберите тарифный план</h3>
+              <h3 style={st.cardHeading}>3. Выберите тарифный план</h3>
               <div style={st.plansGrid}>
                 {currentPlans.map(plan => {
                   const isSelected = selectedPlanId === plan.id;

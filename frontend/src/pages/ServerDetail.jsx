@@ -401,10 +401,11 @@ export default function ServerDetail({ serverId, onBack, user }) {
         { id: 'bedwars', name: 'BedWars Mini-Game Setup', desc: 'Полностью настроенный сервер BedWars с генераторами ресурсов, лобби ожидания и автоматическим запуском арен.', price: 'Бесплатно' },
         { id: 'anarchy', name: 'Hardcore Anarchy Setup', desc: 'Готовая сборка для сервера анархии: приват сундуков, гриферство, оптимизированный античит и кланы.', price: 'Бесплатно' }
       ];
-    } else if (game === 'scp') {
+    } else if (game === 'scp' || game.includes('scp')) {
       return [
-        { id: 'scp_exiled', name: 'EXILED Framework + Plugins', desc: 'Модифицированное ядро EXILED с плагинами кастомных предметов, SCP-035 и плагином авто-баланса.', price: 'Бесплатно' },
-        { id: 'scp_roleplay', name: 'SCP Containment RolePlay', desc: 'Сборка для RP-сервера с ролями ученых, охраны, МОГ, хаоса и расширенными картами доступа.', price: 'Бесплатно' }
+        { id: 'scp_exiled', name: 'EXILED Framework v8.9 + AdminTools', desc: 'Официальное ядро EXILED v8.9 с полной поддержкой плагинов, AdminTools, кастомных предметов, SCP-035 и автозапуска.', price: 'Бесплатно' },
+        { id: 'scp_roleplay', name: 'SCP Containment RolePlay Setup', desc: 'Сборка для RP-сервера с расширенными картами доступа, фракциями учёных, МОГ, Хаоса и плагином автобаланса.', price: 'Бесплатно' },
+        { id: 'scp_classic', name: 'Classic Vanilla SCP Lab', desc: 'Чистая классическая конфигурация сервера SCP: Secret Laboratory с оптимальными FPS-настройками.', price: 'Бесплатно' }
       ];
     } else {
       return [
