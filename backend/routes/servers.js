@@ -784,14 +784,14 @@ router.post('/:id/install-mod', authenticateToken, (req, res) => {
     if (err || !server) return res.status(404).json({ message: 'Сервер не найден' });
 
     if (modId === 'scp_exiled' || modId === 'scp_rp' || modId === 'scp_classic') {
-      const exiledPlugin = `[EXILED Loader Plugin v8.9.2]\nServerPort: ${server.port}\nAutoUpdate: true\nEnableDebug: false\nConfigVersion: 8.9`;
-      const exiledConfig = `exiled:\n  enable_events: true\n  admin_tools: true\n  custom_items: true\n  teleport_commands: true\n  auto_restart_on_crash: true`;
+      const exiledPlugin = `[ExMod-Team/EXILED Loader Plugin v9.14.2]\nServerPort: ${server.port}\nAutoUpdate: true\nEnableDebug: false\nConfigVersion: 9.14.2`;
+      const exiledConfig = `exiled:\n  version: 9.14.2\n  enable_events: true\n  admin_tools: true\n  custom_items: true\n  teleport_commands: true\n  auto_restart_on_crash: true`;
 
-      db.run(`INSERT INTO server_files (server_id, filepath, content, is_directory) VALUES (?, 'exiled/Plugins/Exiled.Events.dll', ?, 0)`, [serverId, exiledPlugin]);
-      db.run(`INSERT INTO server_files (server_id, filepath, content, is_directory) VALUES (?, 'exiled/Configs/config.yml', ?, 0)`, [serverId, exiledConfig]);
-      db.run(`UPDATE server_files SET content = 'server_name: SCP Exiled RP Complex\\nserver_ip: 127.0.0.1\\nmax_players: 40' WHERE server_id = ? AND filepath = 'config_gameplay.txt'`, [serverId]);
+      db.run(`INSERT INTO server_files (server_id, filepath, content, is_directory) VALUES (?, 'EXILED/Plugins/Exiled.Events.dll', ?, 0)`, [serverId, exiledPlugin]);
+      db.run(`INSERT INTO server_files (server_id, filepath, content, is_directory) VALUES (?, 'EXILED/Configs/config.yml', ?, 0)`, [serverId, exiledConfig]);
+      db.run(`UPDATE server_files SET content = 'server_name: SCP Exiled RP Complex [v9.14.2]\\nserver_ip: 127.0.0.1\\nmax_players: 40' WHERE server_id = ? AND filepath = 'config_gameplay.txt'`, [serverId]);
 
-      return res.json({ message: 'Фреймворк EXILED v8.9 и плагины SCP успешно инсталлированы!' });
+      return res.json({ message: 'Официальный фреймворк ExMod-Team/EXILED v9.14.2 и плагины SCP успешно инсталлированы!' });
     }
 
     res.json({ message: `Мод ${modId} успешно установлен на сервер!` });

@@ -403,7 +403,7 @@ export default function ServerDetail({ serverId, onBack, user }) {
       ];
     } else if (game === 'scp' || game.includes('scp')) {
       return [
-        { id: 'scp_exiled', name: 'EXILED Framework v8.9 + AdminTools', desc: 'Официальное ядро EXILED v8.9 с полной поддержкой плагинов, AdminTools, кастомных предметов, SCP-035 и автозапуска.', price: 'Бесплатно' },
+        { id: 'scp_exiled', name: 'ExMod-Team/EXILED v9.14.2 + AdminTools', desc: 'Свежайшее официальное ядро EXILED v9.14.2 (ExMod-Team) с поддержкой C# плагинов, AdminTools, SCP-035 и автообновлений.', price: 'Бесплатно' },
         { id: 'scp_roleplay', name: 'SCP Containment RolePlay Setup', desc: 'Сборка для RP-сервера с расширенными картами доступа, фракциями учёных, МОГ, Хаоса и плагином автобаланса.', price: 'Бесплатно' },
         { id: 'scp_classic', name: 'Classic Vanilla SCP Lab', desc: 'Чистая классическая конфигурация сервера SCP: Secret Laboratory с оптимальными FPS-настройками.', price: 'Бесплатно' }
       ];
