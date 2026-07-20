@@ -12,7 +12,11 @@ module.exports = {
         NODE_ENV: "production",
         PORT: 5000,
         JWT_SECRET: "alany_host_secure_vps_key_2026",
-        DB_TYPE: "sqlite"
+        DB_TYPE: "mysql",
+        DB_HOST: "localhost",
+        DB_USER: "alany_user",
+        DB_PASS: "AlanyHost2026Pass!",
+        DB_NAME: "alany_host"
       }
     }
   ]
