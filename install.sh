@@ -92,6 +92,8 @@ echo "Сборка фронтенда React (Vite)..."
 cd frontend
 npm install
 npm run build
+chmod -R 755 dist || true
+chmod -R 755 .. || true
 cd ..
 
 # 6. Конфигурация Nginx под cloud.alany.ru + phpMyAdmin
