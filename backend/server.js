@@ -57,11 +57,20 @@ app.get('*', (req, res) => {
   });
 });
 
-// Запуск сервера
-app.listen(PORT, () => {
+// Защита от фатальных падений сервера 24/7
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL SYSTEM LOG] Uncaught Exception:', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRITICAL SYSTEM LOG] Unhandled Rejection:', reason);
+});
+
+// Запуск сервера на 0.0.0.0
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`==================================================`);
   console.log(` Сервер Alany Host успешно запущен!`);
-  console.log(` Адрес сервера: http://localhost:${PORT}`);
+  console.log(` Порт: ${PORT}`);
   console.log(` База данных инициализирована и готова к работе.`);
   console.log(`==================================================`);
 });

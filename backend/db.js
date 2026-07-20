@@ -9,26 +9,36 @@ try {
   mysql = null;
 }
 
-const USE_MYSQL = process.env.DB_TYPE === 'mysql' && mysql;
+let USE_MYSQL = process.env.DB_TYPE === 'mysql' && mysql;
 
 let dbInstance = null;
 let mysqlPool = null;
 
-if (USE_MYSQL) {
-  console.log('Инициализация подключения к СУБД MySQL / MariaDB...');
-  mysqlPool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'alany_host',
-    waitForConnections: true,
-    connectionLimit: 20,
-    queueLimit: 0
-  });
-} else {
-  console.log('Подключено к базе данных SQLite (database.sqlite)...');
-  const dbPath = path.resolve(__dirname, '../database.sqlite');
-  dbInstance = new sqlite3.Database(dbPath);
+const initSqlite = () => {
+  if (!dbInstance) {
+    const dbPath = path.resolve(__dirname, '../database.sqlite');
+    dbInstance = new sqlite3.Database(dbPath);
+  }
+};
+
+try {
+  if (USE_MYSQL) {
+    console.log('Инициализация подключения к СУБД MySQL / MariaDB...');
+    mysqlPool = mysql.createPool({
+      host: process.env.DB_HOST || '127.0.0.1',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'alany_host',
+      waitForConnections: true,
+      connectionLimit: 20,
+      queueLimit: 0
+    });
+  }
+  initSqlite();
+} catch (e) {
+  console.error('Ошибка инициализации MySQL, включен SQLite fallback:', e.message);
+  USE_MYSQL = false;
+  initSqlite();
 }
 
 // Адаптер вызовов к БД (универсален для SQLite и MySQL)
