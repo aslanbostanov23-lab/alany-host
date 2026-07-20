@@ -1,6 +1,10 @@
-export const API_BASE = window.location.port === '5173'
-  ? `http://${window.location.hostname}:5000/api`
-  : '/api';
+const getFullUrl = (endpoint) => {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (window.location.port === '5173') {
+    return `http://${window.location.hostname}:5000/api${cleanEndpoint}`;
+  }
+  return `/api${cleanEndpoint}`;
+};
 
 export const getHeaders = () => {
   const token = localStorage.getItem('token');
@@ -14,7 +18,8 @@ export const api = {
   // GET
   get: async (endpoint) => {
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      const url = getFullUrl(endpoint);
+      const response = await fetch(url, {
         method: 'GET',
         headers: getHeaders()
       });
@@ -30,7 +35,8 @@ export const api = {
   // POST
   post: async (endpoint, body = {}) => {
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      const url = getFullUrl(endpoint);
+      const response = await fetch(url, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(body)
@@ -47,7 +53,8 @@ export const api = {
   // PUT
   put: async (endpoint, body = {}) => {
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      const url = getFullUrl(endpoint);
+      const response = await fetch(url, {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify(body)
@@ -64,7 +71,8 @@ export const api = {
   // DELETE
   delete: async (endpoint) => {
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      const url = getFullUrl(endpoint);
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: getHeaders()
       });
