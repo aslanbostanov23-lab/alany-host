@@ -192,22 +192,26 @@ export default function Admin({ user, setCurrentPage, adminTab: propAdminTab, se
 
   const handleCreateNode = async (e) => {
     e.preventDefault();
-    if (!nodeName || !nodeIp) return;
+    if (!nodeName || !nodeIp) {
+      alert('Пожалуйста, заполните название ноды и IP адрес!');
+      return;
+    }
     try {
       await api.post('/admin/nodes', {
         name: nodeName,
-        location: nodeLocation,
+        location: nodeLocation || 'Москва, РФ',
         ip_address: nodeIp,
-        cpu_total: parseInt(nodeCpu),
-        ram_total: parseInt(nodeRam),
-        ssd_total: parseInt(nodeSsd)
+        cpu_total: parseInt(nodeCpu) || 32,
+        ram_total: parseInt(nodeRam) || 128,
+        ssd_total: parseInt(nodeSsd) || 2048
       });
       setShowNodeModal(false);
       setNodeName('');
       setNodeIp('');
+      alert('KVM-нода успешно добавлена!');
       fetchNodes();
     } catch (err) {
-      alert('Ошибка создания ноды');
+      alert(err.message || 'Ошибка создания ноды');
     }
   };
 

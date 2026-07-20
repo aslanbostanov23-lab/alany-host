@@ -123,9 +123,34 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    location /phpmyadmin {
+        root /usr/share/;
+        index index.php index.html index.htm;
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_split_path_info ^(.+\.php)(/.+)$;
+            fastcgi_pass unix:/run/php/php-fpm.sock;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param HTTPS on;
+            fastcgi_param HTTP_SCHEME https;
+            include fastcgi_params;
+        }
     }
 }
 EOF
+
+PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
+if [ -n "$PHP_SOCK" ]; then
+    ln -sf "$PHP_SOCK" /run/php/php-fpm.sock
+fi
+
+mkdir -p /etc/phpmyadmin/conf.d
+cat << 'PMAEOF' > /etc/phpmyadmin/conf.d/alany.inc.php
+<?php
+$cfg['PmaAbsoluteUri'] = 'https://cloud.alany.ru/phpmyadmin/';
+$cfg['AllowThirdPartyFraming'] = true;
+PMAEOF
 
 rm -f /etc/nginx/sites-enabled/*
 rm -f /etc/nginx/sites-available/default
