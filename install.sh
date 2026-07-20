@@ -147,22 +147,32 @@ server {
 EOF
 
 ln -sf /etc/nginx/sites-available/alany-host /etc/nginx/sites-enabled/default
-systemctl restart nginx || true
-systemctl restart php*-fpm || true
+# 7. Автоматический выпуск бесплатного SSL-сертификата HTTPS (Let's Encrypt)
+echo -e "${YELLOW}[6/7] Автоматический выпуск SSL-сертификата HTTPS для ${DOMAIN}...${NC}"
+if command -v certbot &> /dev/null; then
+  certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email -d "${DOMAIN}" || {
+    echo -e "${YELLOW}[ИНФО] Если домен ${DOMAIN} еще не направлен на этот IP, SSL активируется автоматически при привязке A-записи.${NC}"
+  }
+fi
 
-# 7. Автозапуск бэкенда через PM2
-echo -e "${YELLOW}[6/7] Запуск бэкенда Alany Host через PM2...${NC}"
+# 8. Автозапуск бэкенда через PM2
+echo -e "${YELLOW}[7/7] Запуск бэкенда Alany Host через PM2...${NC}"
 cd "$INSTALL_DIR"
 pm2 start ecosystem.config.js || pm2 start backend/server.js --name "alany-host"
 pm2 save
 pm2 startup | tail -n 1 | bash || true
 
-# 8. Финальная оптимизация и вывод данных
+# 9. Финальная оптимизация и вывод данных
 echo -e "${GREEN}"
 echo "=============================================================================="
 echo "  [УСПЕХ] Панель управления ALANY > HOST успешно установлена!"
 echo "=============================================================================="
 echo -e "${NC}"
+echo -e "🔗 Адрес панели (HTTPS): ${CYAN}https://${DOMAIN}/${NC}"
+echo -e "🗄️  БД phpMyAdmin:        ${CYAN}https://${DOMAIN}/phpmyadmin${NC}"
+echo -e "👤 Администратор:        ${YELLOW}admin${NC} / Пароль: ${YELLOW}admin${NC}"
+echo -e "👥 Пользователь:         ${YELLOW}user${NC} / Пароль: ${YELLOW}user${NC}"
+echo "=============================================================================="
 echo -e "🔗 Адрес панели:        ${CYAN}http://cloud.alany.ru/${NC}"
 echo -e "🗄️  БД phpMyAdmin:      ${CYAN}http://cloud.alany.ru/phpmyadmin${NC}"
 echo -e "👤 Демо Администратор: ${YELLOW}admin${NC} / Пароль: ${YELLOW}admin${NC}"
