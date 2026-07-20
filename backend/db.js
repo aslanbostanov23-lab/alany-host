@@ -12,7 +12,7 @@ try {
   mysql = require('mysql2');
 } catch (e) {}
 
-const USE_MYSQL = process.env.DB_TYPE === 'mysql' && mysql;
+const USE_MYSQL = (process.env.DB_TYPE !== 'sqlite') && mysql;
 
 const db = {};
 
