@@ -99,10 +99,17 @@ cd ..
 # 6. Конфигурация Nginx под cloud.alany.ru + phpMyAdmin
 echo -e "${YELLOW}[5/7] Конфигурация веб-сервера Nginx под ${DOMAIN}...${NC}"
 
-# Настройка символической ссылки на phpmyadmin
-ln -sf /usr/share/phpmyadmin "$INSTALL_DIR/frontend/dist/phpmyadmin"
+# Определяем реальный путь к PHP-FPM сокету на этой ОС
+PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
+if [ -z "$PHP_SOCK" ]; then
+    PHP_SOCK="unix:/run/php/php-fpm.sock"
+else
+    PHP_SOCK="unix:${PHP_SOCK}"
+fi
+echo "Найден PHP-FPM сокет: $PHP_SOCK"
 
-cat <<'EOF' > /etc/nginx/sites-available/alany-host
+# Генерируем Nginx конфиг с подставленным сокетом
+cat > /etc/nginx/sites-available/alany-host <<NGINXEOF
 server {
     listen 80;
     server_name cloud.alany.ru;
@@ -112,49 +119,33 @@ server {
 
     client_max_body_size 100M;
 
-    location / {
-        try_files $uri $uri/ /index.html;
+    location /phpmyadmin {
+        root /usr/share;
+        index index.php index.html;
+        location ~ \.php\$ {
+            include fastcgi_params;
+            fastcgi_pass ${PHP_SOCK};
+            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            fastcgi_param HTTPS on;
+        }
     }
 
     location /api {
         proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }
 
-    location /phpmyadmin {
-        alias /usr/share/phpmyadmin/;
-        index index.php index.html index.htm;
-        location ~ \.php$ {
-            try_files $uri =404;
-            fastcgi_split_path_info ^(.+\.php)(/.+)$;
-            fastcgi_pass unix:/run/php/php-fpm.sock;
-            fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $request_filename;
-            fastcgi_param HTTPS on;
-            fastcgi_param HTTP_SCHEME https;
-            include fastcgi_params;
-        }
+    location / {
+        try_files \$uri \$uri/ /index.html;
     }
 }
-EOF
-
-PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
-if [ -n "$PHP_SOCK" ]; then
-    ln -sf "$PHP_SOCK" /run/php/php-fpm.sock
-fi
-
-mkdir -p /etc/phpmyadmin/conf.d
-cat << 'PMAEOF' > /etc/phpmyadmin/conf.d/alany.inc.php
-<?php
-$cfg['PmaAbsoluteUri'] = 'https://cloud.alany.ru/phpmyadmin/';
-$cfg['AllowThirdPartyFraming'] = true;
-PMAEOF
+NGINXEOF
 
 rm -f /etc/nginx/sites-enabled/*
 rm -f /etc/nginx/sites-available/default
