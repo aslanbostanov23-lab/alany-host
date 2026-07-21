@@ -130,21 +130,30 @@ router.get('/:id', authenticateToken, (req, res) => {
 
 // 3. Заказать сервер
 router.post('/buy', authenticateToken, (req, res) => {
-  const { game_type, name, ram_mb, cpu_cores, disk_gb, slots, duration_days } = req.body;
+  const { game_type, name, ram_mb, cpu_cores, disk_gb, slots, duration_days, price } = req.body;
 
   if (!game_type || !name || !ram_mb || !cpu_cores || !disk_gb || !slots) {
     return res.status(400).json({ message: 'Все параметры конфигурации обязательны' });
   }
 
-  const days = duration_days || 30;
+  const days = parseInt(duration_days, 10) || 30;
 
-  // Формула расчета цены за 30 дней:
-  // RAM: 0.5 руб за 1 МБ
-  // CPU: 100 руб за ядро
-  // Disk: 5 руб за 1 ГБ
-  // Slots: 2 руб за слот
-  const baseMonthlyPrice = (ram_mb * 0.4) + (cpu_cores * 80) + (disk_gb * 4) + (slots * 1.5);
-  const totalPrice = parseFloat(((baseMonthlyPrice / 30) * days).toFixed(2));
+  // Базовые тарифные сетки
+  const defaultPrices = {
+    minecraft: 350,
+    cs2: 450,
+    gta_samp: 190,
+    gta_mta: 250,
+    scp: 490,
+    discord_bot: 90
+  };
+
+  let baseMonthlyPrice = parseFloat(price) || defaultPrices[game_type] || 350;
+  let multiplier = 1;
+  if (days === 90) multiplier = 3 * 0.95;
+  if (days === 180) multiplier = 6 * 0.90;
+
+  const totalPrice = parseFloat((baseMonthlyPrice * (days / 30) * (days === 90 ? 0.95 : days === 180 ? 0.90 : 1)).toFixed(2));
 
   // Получаем текущего пользователя для проверки баланса
   db.get(`SELECT balance FROM users WHERE id = ?`, [req.user.id], (userErr, user) => {
@@ -152,80 +161,71 @@ router.post('/buy', authenticateToken, (req, res) => {
       return res.status(500).json({ message: 'Пользователь не найден' });
     }
 
-    if (user.balance < totalPrice) {
-      return res.status(400).json({ message: `Недостаточно средств. Необходимо: ${totalPrice} ₽, на вашем балансе: ${user.balance.toFixed(2)} ₽` });
+    const userBalance = parseFloat(user.balance) || 0.0;
+
+    if (userBalance < totalPrice) {
+      return res.status(400).json({ 
+        message: `Недостаточно средств. Необходимо: ${totalPrice.toFixed(2)} ₽, на вашем балансе: ${userBalance.toFixed(2)} ₽` 
+      });
     }
 
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
+    // Списываем баланс пользователя
+    db.run(`UPDATE users SET balance = balance - ? WHERE id = ?`, [totalPrice, req.user.id], (updateErr) => {
+      if (updateErr) {
+        return res.status(500).json({ message: 'Ошибка списания средств' });
+      }
 
-      // Списываем баланс
+      // Создаем запись финансовой транзакции
       db.run(
-        `UPDATE users SET balance = balance - ? WHERE id = ?`,
-        [totalPrice, req.user.id],
-        (updateErr) => {
-          if (updateErr) {
-            db.run('ROLLBACK');
-            return res.status(500).json({ message: 'Ошибка списания средств' });
+        `INSERT INTO transactions (user_id, amount, type, description) VALUES (?, ?, 'payment', ?)`,
+        [req.user.id, -totalPrice, `Аренда сервера ${name} (${game_type}) на ${days} дней`]
+      );
+
+      const ip = getRandomIP();
+      const port = getRandomPort();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + days);
+
+      // Создаем запись сервера в БД
+      db.run(
+        `INSERT INTO servers (user_id, game_type, name, status, ip_address, port, ram_mb, cpu_cores, disk_gb, slots, price_per_day, expires_at)
+         VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.user.id,
+          game_type,
+          name,
+          ip,
+          port,
+          parseInt(ram_mb, 10),
+          parseInt(cpu_cores, 10),
+          parseInt(disk_gb, 10),
+          parseInt(slots, 10),
+          parseFloat((totalPrice / days).toFixed(2)),
+          expiresAt.toISOString().slice(0, 19).replace('T', ' ')
+        ],
+        function (srvErr) {
+          if (srvErr) {
+            console.error('Ошибка добавления сервера:', srvErr);
+            return res.status(500).json({ message: 'Ошибка создания записи сервера' });
           }
 
-          // Создаем транзакцию
-          db.run(
-            `INSERT INTO transactions (user_id, amount, type, description) VALUES (?, ?, 'payment', ?)`,
-            [req.user.id, -totalPrice, `Аренда сервера ${name} (${game_type}) на ${days} дней`],
-            (txErr) => {
-              if (txErr) {
-                db.run('ROLLBACK');
-                return res.status(500).json({ message: 'Ошибка записи транзакции' });
+          const newServerId = this.lastID;
+
+          // Создаем дефолтные файлы конфигурации игрового сервера
+          createDefaultFiles(newServerId, game_type, name, db, (fileErr) => {
+            res.status(201).json({
+              message: 'Игровой сервер успешно создан и запущен!',
+              serverId: newServerId,
+              server: {
+                id: newServerId,
+                name,
+                game_type,
+                ip,
+                port,
+                status: 'stopped'
               }
-
-              const ip = getRandomIP();
-              const port = getRandomPort();
-              const expiresAt = new Date();
-              expiresAt.setDate(expiresAt.getDate() + days);
-
-              // Создаем сервер
-              db.run(
-                `INSERT INTO servers (user_id, game_type, name, status, ip_address, port, ram_mb, cpu_cores, disk_gb, slots, price_per_day, expires_at)
-                 VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                  req.user.id,
-                  game_type,
-                  name,
-                  ip,
-                  port,
-                  ram_mb,
-                  cpu_cores,
-                  disk_gb,
-                  slots,
-                  parseFloat((baseMonthlyPrice / 30).toFixed(2)),
-                  expiresAt.toISOString()
-                ],
-                function (srvErr) {
-                  if (srvErr) {
-                    db.run('ROLLBACK');
-                    return res.status(500).json({ message: 'Ошибка создания сервера' });
-                  }
-
-                  const newServerId = this.lastID;
-
-                  // Создаем дефолтные файлы
-                  createDefaultFiles(newServerId, game_type, name, db, (fileErr) => {
-                    if (fileErr) {
-                      db.run('ROLLBACK');
-                      return res.status(500).json({ message: 'Ошибка создания конфигурационных файлов сервера' });
-                    }
-
-                    db.run('COMMIT');
-                    res.status(201).json({
-                      message: 'Сервер успешно заказан и готов к работе!',
-                      serverId: newServerId
-                    });
-                  });
-                }
-              );
-            }
-          );
+            });
+          });
         }
       );
     });

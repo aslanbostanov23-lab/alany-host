@@ -122,6 +122,7 @@ export default function OrderServer({ user, onOrderSuccess, setCurrentPage }) {
         disk_gb: currentPlan.disk,
         slots: currentPlan.slots,
         duration_days: duration,
+        price: currentPlan.price,
         node_id: selectedNodeId
       });
 
