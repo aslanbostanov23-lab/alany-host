@@ -181,53 +181,81 @@ router.post('/buy', authenticateToken, (req, res) => {
         [req.user.id, -totalPrice, `Аренда сервера ${name} (${game_type}) на ${days} дней`]
       );
 
-      const ip = getRandomIP();
-      const port = getRandomPort();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + days);
+      const targetNodeId = parseInt(req.body.node_id, 10) || 1;
 
-      // Создаем запись сервера в БД
-      db.run(
-        `INSERT INTO servers (user_id, game_type, name, status, ip_address, port, ram_mb, cpu_cores, disk_gb, slots, price_per_day, expires_at)
-         VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          req.user.id,
-          game_type,
-          name,
-          ip,
-          port,
-          parseInt(ram_mb, 10),
-          parseInt(cpu_cores, 10),
-          parseInt(disk_gb, 10),
-          parseInt(slots, 10),
-          parseFloat((totalPrice / days).toFixed(2)),
-          expiresAt.toISOString().slice(0, 19).replace('T', ' ')
-        ],
-        function (srvErr) {
-          if (srvErr) {
-            console.error('Ошибка добавления сервера:', srvErr);
-            return res.status(500).json({ message: 'Ошибка создания записи сервера' });
+      db.get(`SELECT ip_address FROM nodes WHERE id = ?`, [targetNodeId], (nodeErr, node) => {
+        let serverIp = node && node.ip_address && node.ip_address !== '127.0.0.1' 
+          ? node.ip_address 
+          : (req.headers.host ? req.headers.host.split(':')[0] : 'cloud.alany.ru');
+
+        const defaultGamePorts = {
+          minecraft: 25565,
+          gta_samp: 7777,
+          gta_mta: 22003,
+          cs2: 27015,
+          scp: 7778,
+          discord_bot: 0
+        };
+
+        const basePort = defaultGamePorts[game_type] || 7777;
+
+        db.all(`SELECT port FROM servers WHERE ip_address = ? OR port >= ?`, [serverIp, basePort], (portErr, existingServers) => {
+          const usedPorts = new Set((existingServers || []).map(s => s.port));
+          let port = basePort;
+
+          if (port > 0) {
+            while (usedPorts.has(port)) {
+              port += 1;
+            }
           }
 
-          const newServerId = this.lastID;
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + days);
 
-          // Создаем дефолтные файлы конфигурации игрового сервера
-          createDefaultFiles(newServerId, game_type, name, db, (fileErr) => {
-            res.status(201).json({
-              message: 'Игровой сервер успешно создан и запущен!',
-              serverId: newServerId,
-              server: {
-                id: newServerId,
-                name,
-                game_type,
-                ip,
-                port,
-                status: 'stopped'
+          // Создаем запись сервера в БД
+          db.run(
+            `INSERT INTO servers (user_id, game_type, name, status, ip_address, port, ram_mb, cpu_cores, disk_gb, slots, price_per_day, expires_at)
+             VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              req.user.id,
+              game_type,
+              name,
+              serverIp,
+              port,
+              parseInt(ram_mb, 10),
+              parseInt(cpu_cores, 10),
+              parseInt(disk_gb, 10),
+              parseInt(slots, 10),
+              parseFloat((totalPrice / days).toFixed(2)),
+              expiresAt.toISOString().slice(0, 19).replace('T', ' ')
+            ],
+            function (srvErr) {
+              if (srvErr) {
+                console.error('Ошибка добавления сервера:', srvErr);
+                return res.status(500).json({ message: 'Ошибка создания записи сервера' });
               }
-            });
-          });
-        }
-      );
+
+              const newServerId = this.lastID;
+
+              // Создаем дефолтные файлы конфигурации игрового сервера
+              createDefaultFiles(newServerId, game_type, name, db, (fileErr) => {
+                res.status(201).json({
+                  message: 'Игровой сервер успешно создан и запущен!',
+                  serverId: newServerId,
+                  server: {
+                    id: newServerId,
+                    name,
+                    game_type,
+                    ip: serverIp,
+                    port,
+                    status: 'stopped'
+                  }
+                });
+              });
+            }
+          );
+        });
+      });
     });
   });
 });
