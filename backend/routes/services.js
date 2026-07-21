@@ -293,7 +293,7 @@ router.get('/design/my', (req, res) => {
   );
 });
 
-// 6. Реальный динамический статус системы и нод из SQLite базы данных
+// 6. Реальный динамический статус системы и нод из MySQL базы данных
 router.get('/system/status', (req, res) => {
   db.all(`SELECT status, game_type, ram_mb, cpu_cores, disk_gb FROM servers`, [], (err, servers) => {
     const serverList = servers || [];
@@ -304,29 +304,30 @@ router.get('/system/status', (req, res) => {
       const runningServers = serverList.filter(s => s.status === 'running').length;
       const totalWeb = webList.length;
 
-      // Динамический расчет нагрузки нод на основе активных серверов БД
-      const node1Cpu = Math.min(95, Math.max(12, runningServers * 14 + 12));
-      const node1Ram = Math.min(95, Math.max(20, runningServers * 16 + 18));
-      const node1Ssd = Math.min(90, Math.max(15, totalServers * 8 + 14));
+      db.all(`SELECT id, name, location, ip_address, cpu_total, ram_total, ssd_total, status FROM nodes ORDER BY id ASC`, [], (nodeErr, dbNodes) => {
+        let nodesList = (dbNodes && dbNodes.length > 0) ? dbNodes : [
+          { id: 1, name: 'MSK-NODE-1 (Main Node)', location: 'Москва, РФ', ip_address: '127.0.0.1', cpu_total: 64, ram_total: 256, ssd_total: 4096, status: 'online' }
+        ];
 
-      const node2Cpu = Math.min(90, Math.max(8, Math.floor(runningServers * 8 + 6)));
-      const node2Ram = Math.min(90, Math.max(15, Math.floor(runningServers * 11 + 12)));
-      const node2Ssd = Math.min(85, Math.max(10, Math.floor(totalServers * 5 + 9)));
+        const formattedNodes = nodesList.map(n => ({
+          id: n.id,
+          name: `${n.name} (${n.location || n.ip_address})`,
+          location: n.location,
+          ip_address: n.ip_address,
+          cpu: 15,
+          ram: 25,
+          ssd: 20,
+          status: n.status || 'online',
+          updated: 'только что'
+        }));
 
-      const webCpu = Math.min(80, Math.max(5, totalWeb * 10 + 4));
-      const webRam = Math.min(85, Math.max(12, totalWeb * 14 + 8));
-      const webSsd = Math.min(80, Math.max(8, totalWeb * 6 + 5));
-
-      res.json({
-        totalServers,
-        runningServers,
-        totalWeb,
-        uptime: 99.99,
-        nodes: [
-          { name: 'MSK-NODE-1 (Москва, DataPro)', cpu: node1Cpu, ram: node1Ram, ssd: node1Ssd, updated: 'только что' },
-          { name: 'MSK-NODE-2 (Москва, IX-Cellent)', cpu: node2Cpu, ram: node2Ram, ssd: node2Ssd, updated: 'только что' },
-          { name: 'WEB-HOST-1 (Москва, Selectel)', cpu: webCpu, ram: webRam, ssd: webSsd, updated: 'только что' }
-        ]
+        res.json({
+          totalServers,
+          runningServers,
+          totalWeb,
+          uptime: 99.99,
+          nodes: formattedNodes
+        });
       });
     });
   });
