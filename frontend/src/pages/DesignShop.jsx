@@ -176,7 +176,7 @@ export default function DesignShop({ user, onOrderSuccess, setCurrentPage }) {
 
               <div style={styles.checkoutActions}>
                 <span style={styles.balanceText}>
-                  Ваш баланс: <strong>{user.balance.toFixed(2)} ₽</strong>
+                  Ваш баланс: <strong>{Number(user?.balance || 0).toFixed(2)} ₽</strong>
                 </span>
                 <button 
                   onClick={handleOrder}

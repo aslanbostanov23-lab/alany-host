@@ -251,7 +251,7 @@ export default function Navbar({
             title={t('pay_balance')}
           >
             <CreditCard size={14} color="var(--accent-blue)" />
-            <span style={styles.balanceValue}>{user.balance ? user.balance.toFixed(2) : '0.00'} ₽</span>
+            <span style={styles.balanceValue}>{Number(user?.balance || 0).toFixed(2)} ₽</span>
             <span style={styles.plusIcon}>+</span>
           </button>
         )}

@@ -256,7 +256,7 @@ export default function Billing({ user, onRefillSuccess }) {
                             ...styles.txAmount,
                             color: isRefill ? 'var(--status-success)' : 'var(--text-primary)'
                           }}>
-                            {isRefill ? '+' : ''}{tx.amount.toFixed(2)} ₽
+                            {isRefill ? '+' : ''}{Number(tx.amount || 0).toFixed(2)} ₽
                           </span>
                         </td>
                       </tr>

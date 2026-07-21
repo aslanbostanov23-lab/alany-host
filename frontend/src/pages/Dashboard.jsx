@@ -67,7 +67,7 @@ export default function Dashboard({ user, onSelectServer, setCurrentPage }) {
               <CreditCard size={18} color="var(--text-primary)" />
             </div>
           </div>
-          <div style={st.statValue}>{user?.balance ? user.balance.toFixed(2) : '0.00'} ₽</div>
+          <div style={st.statValue}>{Number(user?.balance || 0).toFixed(2)} ₽</div>
           <button className="btn btn-secondary" onClick={() => setCurrentPage('billing')} style={st.statActionBtn}>
             <span>Пополнить баланс</span>
             <ArrowRight size={14} />

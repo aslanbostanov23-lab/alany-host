@@ -101,7 +101,7 @@ export default function WheelOfFortune({ user, onSpinSuccess }) {
     const freeAvailable = isFreeSpinAvailable();
     
     if (!freeAvailable && user.balance < 25) {
-      setError(`Недостаточно средств. Для платной прокрутки требуется 25 ₽, ваш баланс: ${user.balance.toFixed(2)} ₽`);
+      setError(`Недостаточно средств. Для платной прокрутки требуется 25 ₽, ваш баланс: ${Number(user?.balance || 0).toFixed(2)} ₽`);
       return;
     }
 

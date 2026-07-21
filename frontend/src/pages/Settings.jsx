@@ -191,7 +191,7 @@ export default function Settings({ user, setCurrentPage, t }) {
         <div style={st.heroStats}>
           <div style={st.heroStat}>
             <span style={st.heroStatLabel}>Баланс</span>
-            <span style={st.heroStatValue}>{user?.balance?.toFixed(2) ?? '0.00'} ₽</span>
+            <span style={st.heroStatValue}>{Number(user?.balance || 0).toFixed(2)} ₽</span>
           </div>
           <div style={st.heroStat}>
             <span style={st.heroStatLabel}>Бонусы</span>

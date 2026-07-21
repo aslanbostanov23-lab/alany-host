@@ -394,7 +394,7 @@ export default function Admin({ user, setCurrentPage, adminTab: propAdminTab, se
             />
             <StatCard 
               title="Оборот платежей" 
-              value={`${stats?.total_refills?.toFixed(2) || '0.00'} ₽`} 
+              value={`${Number(stats?.total_refills || 0).toFixed(2)} ₽`} 
               icon={CreditCard} 
             />
           </div>
@@ -424,7 +424,7 @@ export default function Admin({ user, setCurrentPage, adminTab: propAdminTab, se
                             {u.role}
                           </span>
                         </td>
-                        <td>{u.balance?.toFixed(2)} ₽</td>
+                        <td>{Number(u.balance || 0).toFixed(2)} ₽</td>
                       </tr>
                     ))}
                   </tbody>
@@ -493,7 +493,7 @@ export default function Admin({ user, setCurrentPage, adminTab: propAdminTab, se
                         {u.role}
                       </span>
                     </td>
-                    <td style={{ fontWeight: 800 }}>{u.balance?.toFixed(2)} ₽</td>
+                    <td style={{ fontWeight: 800 }}>{Number(u.balance || 0).toFixed(2)} ₽</td>
                     <td style={{ textAlign: 'right', display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
                       <button 
                         className="btn btn-secondary" 
