@@ -72,7 +72,7 @@ router.post('/login', (req, res) => {
           username: user.username,
           email: user.email,
           role: user.role,
-          balance: user.balance
+          balance: parseFloat(user.balance) || 0.0
         }
       });
     }
@@ -88,6 +88,7 @@ router.get('/me', authenticateToken, (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
+    user.balance = parseFloat(user.balance) || 0.0;
     res.json(user);
   });
 });
