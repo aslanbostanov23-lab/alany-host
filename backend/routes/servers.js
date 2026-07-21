@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const nodeDaemon = require('../nodeDaemon');
 const { authenticateToken } = require('../middleware/auth');
 
 // Генерация случайного IP
@@ -86,6 +87,9 @@ const createDefaultFiles = (serverId, gameType, serverName, dbTransaction, callb
         }
         completed++;
         if (completed === files.length && !hasError) {
+          try {
+            nodeDaemon.writeFilesToDisk(serverId, files);
+          } catch (e) {}
           callback(null);
         }
       }
@@ -260,11 +264,16 @@ router.post('/:id/power', authenticateToken, (req, res) => {
             return res.status(500).json({ message: 'Ошибка переключения питания' });
           }
 
-          // Если статус 'starting', через 3 секунды симулируем автозапуск в 'running'
-          if (newStatus === 'starting') {
-            setTimeout(() => {
-              db.run(`UPDATE servers SET status = 'running' WHERE id = ?`, [serverId]);
-            }, 3000);
+          if (action === 'start' || action === 'restart') {
+            if (action === 'restart') nodeDaemon.stopServer(serverId);
+            nodeDaemon.startServer(server, (daemonErr) => {
+              const finalStatus = daemonErr ? 'stopped' : 'running';
+              db.run(`UPDATE servers SET status = ? WHERE id = ?`, [finalStatus, serverId]);
+            });
+          } else if (action === 'stop') {
+            nodeDaemon.stopServer(serverId, () => {
+              db.run(`UPDATE servers SET status = 'stopped' WHERE id = ?`, [serverId]);
+            });
           }
 
           res.json({ message: `Команда ${action} успешно отправлена`, status: newStatus });
@@ -272,6 +281,23 @@ router.post('/:id/power', authenticateToken, (req, res) => {
       );
     }
   );
+});
+
+// Получить логи консоли сервера
+router.get('/:id/console', authenticateToken, (req, res) => {
+  const serverId = req.params.id;
+  const logs = nodeDaemon.getConsoleLogs(serverId);
+  res.json({ logs });
+});
+
+// Отправить команду в консоль сервера
+router.post('/:id/command', authenticateToken, (req, res) => {
+  const serverId = req.params.id;
+  const { command } = req.body;
+  if (command) {
+    nodeDaemon.sendConsoleCommand(serverId, command);
+  }
+  res.json({ message: 'Команда отправлена' });
 });
 
 // 5. Установка модов / сборок на сервер с разворачиванием файлов в SQLite DB

@@ -282,4 +282,26 @@ router.delete('/nodes/:id', (req, res) => {
   });
 });
 
+// 16. Список всех веб-хостингов (для админа)
+router.get('/webhosts', (req, res) => {
+  db.all(
+    `SELECT w.*, u.username as owner_name 
+     FROM webhosts w 
+     JOIN users u ON w.user_id = u.id 
+     ORDER BY w.created_at DESC`,
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: 'Ошибка получения списка веб-хостингов' });
+      res.json(rows || []);
+    }
+  );
+});
+
+// 17. Удаление веб-хостинга
+router.delete('/webhosts/:id', (req, res) => {
+  db.run(`DELETE FROM webhosts WHERE id = ?`, [req.params.id], (err) => {
+    if (err) return res.status(500).json({ message: 'Ошибка удаления веб-хостинга' });
+    res.json({ message: 'Веб-хостинг успешно удален' });
+  });
+});
+
 module.exports = router;

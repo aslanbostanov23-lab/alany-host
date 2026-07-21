@@ -1,34 +1,22 @@
-const path = require('path');
+const mysql = require('mysql2');
 const bcrypt = require('bcryptjs');
 
-let sqlite3 = null;
-let mysql = null;
+console.log('Инициализация подключения к СУБД MySQL / MariaDB (alany_host)...');
 
-try {
-  sqlite3 = require('sqlite3').verbose();
-} catch (e) {}
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'alany_user',
+  password: process.env.DB_PASS || 'AlanyHost2026Pass!',
+  database: process.env.DB_NAME || 'alany_host',
+  port: parseInt(process.env.DB_PORT, 10) || 3306,
+  waitForConnections: true,
+  connectionLimit: 15,
+  queueLimit: 0,
+  charset: 'utf8mb4'
+});
 
-try {
-  mysql = require('mysql2');
-} catch (e) {}
-
-const USE_MYSQL = (process.env.DB_TYPE !== 'sqlite') && mysql;
-
-const db = {};
-
-if (USE_MYSQL) {
-  console.log('Подключение бэкенда Alany Host к СУБД MySQL / MariaDB (alany_host)...');
-  const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'alany_user',
-    password: process.env.DB_PASS || 'AlanyHost2026Pass!',
-    database: process.env.DB_NAME || 'alany_host',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-
-  db.get = (sql, params, callback) => {
+const db = {
+  get: (sql, params, callback) => {
     if (typeof params === 'function') {
       callback = params;
       params = [];
@@ -37,9 +25,9 @@ if (USE_MYSQL) {
       if (err) return callback ? callback(err, null) : null;
       callback ? callback(null, results && results[0] ? results[0] : null) : null;
     });
-  };
+  },
 
-  db.all = (sql, params, callback) => {
+  all: (sql, params, callback) => {
     if (typeof params === 'function') {
       callback = params;
       params = [];
@@ -48,16 +36,19 @@ if (USE_MYSQL) {
       if (err) return callback ? callback(err, []) : null;
       callback ? callback(null, results || []) : null;
     });
-  };
+  },
 
-  db.run = function(sql, params, callback) {
+  run: function(sql, params, callback) {
     if (typeof params === 'function') {
       callback = params;
       params = [];
     }
+
+    // Совместимость с SQLite транзакциями и типами данных
     let cleanSql = sql
       .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'INT AUTO_INCREMENT PRIMARY KEY')
-      .replace(/DATETIME DEFAULT CURRENT_TIMESTAMP/gi, 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+      .replace(/DATETIME DEFAULT CURRENT_TIMESTAMP/gi, 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+      .replace(/BEGIN TRANSACTION/gi, 'START TRANSACTION');
 
     pool.query(cleanSql, params || [], function(err, results) {
       const context = {
@@ -66,52 +57,17 @@ if (USE_MYSQL) {
       };
       if (callback) callback.call(context, err);
     });
-  };
+  },
 
-  db.serialize = (callback) => {
+  serialize: (callback) => {
     if (callback) callback();
-  };
-} else {
-  console.log('Подключение бэкенда Alany Host к резервной SQLite (database.sqlite)...');
-  const dbPath = path.resolve(__dirname, '../database.sqlite');
-  const dbInstance = new sqlite3.Database(dbPath);
+  }
+};
 
-  db.get = (sql, params, callback) => {
-    if (typeof params === 'function') {
-      callback = params;
-      params = [];
-    }
-    dbInstance.get(sql, params, callback);
-  };
-
-  db.all = (sql, params, callback) => {
-    if (typeof params === 'function') {
-      callback = params;
-      params = [];
-    }
-    dbInstance.all(sql, params, callback);
-  };
-
-  db.run = function(sql, params, callback) {
-    if (typeof params === 'function') {
-      callback = params;
-      params = [];
-    }
-    dbInstance.run(sql, params, function(err) {
-      if (callback) callback.call(this, err);
-    });
-  };
-
-  db.serialize = (callback) => {
-    dbInstance.serialize(callback);
-  };
-}
-
-// Инициализация таблиц базы данных
+// Инициализация таблиц базы данных MariaDB / MySQL
 const initDatabase = () => {
-  const isMysql = USE_MYSQL;
-  const autoInc = isMysql ? 'INT AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
-  const datetime = isMysql ? 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' : 'DATETIME DEFAULT CURRENT_TIMESTAMP';
+  const autoInc = 'INT AUTO_INCREMENT PRIMARY KEY';
+  const datetime = 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP';
 
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
@@ -119,18 +75,19 @@ const initDatabase = () => {
       username VARCHAR(255) UNIQUE NOT NULL,
       email VARCHAR(255) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      balance REAL DEFAULT 0,
+      balance DECIMAL(12,2) DEFAULT 0.00,
       role VARCHAR(50) DEFAULT 'user',
       avatar TEXT,
       telegram VARCHAR(255),
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createServersTable = `
     CREATE TABLE IF NOT EXISTS servers (
       id ${autoInc},
       user_id INT NOT NULL,
+      node_id INT DEFAULT 1,
       game_type VARCHAR(100) NOT NULL,
       name VARCHAR(255) NOT NULL,
       status VARCHAR(50) DEFAULT 'stopped',
@@ -140,10 +97,10 @@ const initDatabase = () => {
       cpu_cores INT NOT NULL,
       disk_gb INT NOT NULL,
       slots INT NOT NULL,
-      price_per_day REAL NOT NULL,
+      price_per_day DECIMAL(10,2) NOT NULL,
       expires_at TIMESTAMP NULL,
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createServerFilesTable = `
@@ -152,8 +109,8 @@ const initDatabase = () => {
       server_id INT NOT NULL,
       filepath VARCHAR(500) NOT NULL,
       content LONGTEXT NOT NULL,
-      is_directory INT DEFAULT 0
-    )
+      is_directory TINYINT DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createTicketsTable = `
@@ -163,7 +120,7 @@ const initDatabase = () => {
       subject VARCHAR(255) NOT NULL,
       status VARCHAR(50) DEFAULT 'open',
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createTicketMessagesTable = `
@@ -174,29 +131,29 @@ const initDatabase = () => {
       message LONGTEXT NOT NULL,
       attachment LONGTEXT,
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createTransactionsTable = `
     CREATE TABLE IF NOT EXISTS transactions (
       id ${autoInc},
       user_id INT NOT NULL,
-      amount REAL NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
       type VARCHAR(50) NOT NULL,
       description TEXT,
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createPromocodesTable = `
     CREATE TABLE IF NOT EXISTS promocodes (
       id ${autoInc},
       code VARCHAR(100) UNIQUE NOT NULL,
-      amount REAL NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
       uses_count INT DEFAULT 0,
       max_uses INT DEFAULT 100,
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createWebhostsTable = `
@@ -213,7 +170,7 @@ const initDatabase = () => {
       mysql_pass VARCHAR(100) NOT NULL,
       expires_at TIMESTAMP NULL,
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createNodesTable = `
@@ -222,12 +179,14 @@ const initDatabase = () => {
       name VARCHAR(255) NOT NULL,
       location VARCHAR(255) NOT NULL,
       ip_address VARCHAR(100) NOT NULL,
-      cpu_total INT NOT NULL,
-      ram_total INT NOT NULL,
-      ssd_total INT NOT NULL,
+      port INT DEFAULT 5001,
+      secret_token VARCHAR(255) DEFAULT 'alany_node_secret_key_2026',
+      cpu_total INT DEFAULT 32,
+      ram_total INT DEFAULT 128,
+      ssd_total INT DEFAULT 2048,
       status VARCHAR(50) DEFAULT 'online',
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createServerDatabasesTable = `
@@ -239,7 +198,7 @@ const initDatabase = () => {
       password VARCHAR(255) NOT NULL,
       host VARCHAR(100) DEFAULT '127.0.0.1',
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createServerBackupsTable = `
@@ -249,7 +208,7 @@ const initDatabase = () => {
       filename VARCHAR(255) NOT NULL,
       size VARCHAR(100) NOT NULL,
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
   const createServerTasksTable = `
@@ -262,27 +221,33 @@ const initDatabase = () => {
       command TEXT,
       status VARCHAR(50) DEFAULT 'active',
       created_at ${datetime}
-    )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 
-  db.run(createUsersTable);
-  db.run(createServersTable);
-  db.run(createServerFilesTable);
-  db.run(createTicketsTable);
-  db.run(createTicketMessagesTable);
-  db.run(createTransactionsTable);
-  db.run(createPromocodesTable);
-  db.run(createWebhostsTable);
-  db.run(createNodesTable);
-  db.run(createServerDatabasesTable);
-  db.run(createServerBackupsTable);
-  db.run(createServerTasksTable);
+  const tables = [
+    createUsersTable,
+    createServersTable,
+    createServerFilesTable,
+    createTicketsTable,
+    createTicketMessagesTable,
+    createTransactionsTable,
+    createPromocodesTable,
+    createWebhostsTable,
+    createNodesTable,
+    createServerDatabasesTable,
+    createServerBackupsTable,
+    createServerTasksTable
+  ];
 
-  // Инициализация администраторов и тестовых пользователей
+  tables.forEach(tableSql => {
+    db.run(tableSql);
+  });
+
+  // Автосоздание стартового администратора и локальной ноды в MySQL
   setTimeout(() => {
     db.get("SELECT COUNT(*) as count FROM users", [], (err, row) => {
       if (!err && row && (row.count === 0 || row.count === '0' || row.count === 0)) {
-        console.log("Создаем дефолтных пользователей в базе данных...");
+        console.log("Инициализация начальных записей в MySQL (пользователь admin и user)...");
         const adminPassHash = bcrypt.hashSync('admin', 10);
         const userPassHash = bcrypt.hashSync('user', 10);
 
@@ -300,18 +265,15 @@ const initDatabase = () => {
 
     db.get("SELECT COUNT(*) as count FROM nodes", [], (err, row) => {
       if (!err && row && (row.count === 0 || row.count === '0' || row.count === 0)) {
-        db.run(`INSERT INTO nodes (name, location, ip_address, cpu_total, ram_total, ssd_total, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          ['MSK-NODE-1 (DataPro)', 'Москва, РФ', '194.58.118.23', 64, 256, 4096, 'online']
-        );
-        db.run(`INSERT INTO nodes (name, location, ip_address, cpu_total, ram_total, ssd_total, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          ['MSK-NODE-2 (IX-Cellent)', 'Москва, РФ', '185.189.15.112', 32, 128, 2048, 'online']
-        );
-        db.run(`INSERT INTO nodes (name, location, ip_address, cpu_total, ram_total, ssd_total, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          ['WEB-HOST-1 (Selectel)', 'Москва, РФ', '46.174.52.88', 16, 64, 1024, 'online']
+        console.log("Инициализация локальной KVM-ноды по умолчанию...");
+        db.run(
+          `INSERT INTO nodes (name, location, ip_address, port, secret_token, cpu_total, ram_total, ssd_total, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ['MSK-NODE-1 (Main Node)', 'Москва, РФ (Главный узел)', '127.0.0.1', 5001, 'alany_node_secret_key_2026', 64, 256, 4096, 'online']
         );
       }
     });
-  }, 500);
+  }, 1000);
 };
 
 initDatabase();

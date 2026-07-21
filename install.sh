@@ -1,31 +1,22 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # ==============================================================================
-# ALANY > HOST — Автоматический инсталлятор панели управления и ноды
-# Домен: cloud.alany.ru
-# ОС: Ubuntu 20.04 / 22.04 / 24.04, Debian 11 / 12
+# Alany Host — Официальный автоинсталлятор Панели и Ноды (Чистая MariaDB/MySQL)
 # ==============================================================================
 
 set -e
 
-# Цвета для терминала
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${CYAN}"
-echo "  █████╗ ██╗      █████╗ ███╗   ██╗██╗   ██╗    ██╗  ██╗██████╗ ███████╗████████╗"
-echo " ██╔══██╗██║     ██╔══██╗████╗  ██║╚██╗ ██╔╝    ██║  ██║██╔══██╗██╔════╝╚══██╔══╝"
-echo " ███████║██║     ███████║██╔██╗ ██║ ╚████╔╝     ███████║██║  ██║███████╗   ██║   "
-echo " ██╔══██║██║     ██╔══██║██║╚██╗██║  ╚██╔╝      ██╔══██║██║  ██║╚════██║   ██║   "
-echo " ██║  ██║███████╗██║  ██║██║ ╚████║   ██║       ██║  ██║██████╔╝███████║   ██║   "
-echo " ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝       ╚═╝  ╚═╝╚═════╝ ╚══════╝   ╚═╝   "
-echo -e "${NC}"
-echo -e "${BLUE}==============================================================================${NC}"
-echo -e "${GREEN}Установка игрового хостинга ALANY > HOST на домен: cloud.alany.ru${NC}"
-echo -e "${BLUE}==============================================================================${NC}"
+echo -e "${BLUE}======================================================================${NC}"
+echo -e "${GREEN}        Запуск установки Alany Host (MySQL Pure Edition)             ${NC}"
+echo -e "${BLUE}======================================================================${NC}"
+
+DOMAIN="cloud.alany.ru"
+INSTALL_DIR="/var/www/alany-host"
 
 # 1. Проверка прав root
 if [ "$EUID" -ne 0 ]; then
@@ -33,88 +24,82 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-DOMAIN="cloud.alany.ru"
-INSTALL_DIR="/var/www/alany-host"
+# 2. Обновление пакетов и установка системных зависимостей
+echo -e "${YELLOW}[1/7] Установка системных зависимостей (MariaDB, Nginx, PHP, Node.js)...${NC}"
+apt-get update -y
+apt-get install -y mariadb-server mariadb-client nginx php-fpm php-mysql phpmyadmin certbot python3-certbot-nginx curl git psmisc unzip openjdk-17-jre-headless || true
 
-# 2. Обновление пакетов
-echo -e "${YELLOW}[1/7] Обновление системных пакетов...${NC}"
-apt update -y && apt upgrade -y
-apt install -y curl wget git build-essential nginx mariadb-server mariadb-client sqlite3 certbot python3-certbot-nginx ufw
+# 3. Настройка и запуск MariaDB (MySQL)
+echo -e "${YELLOW}[2/7] Настройка базы данных MariaDB / MySQL...${NC}"
+systemctl enable mariadb
+systemctl start mariadb
 
-# 3. Установка Node.js 20 и PM2
-echo -e "${YELLOW}[2/7] Установка Node.js 20 LTS и PM2...${NC}"
-if ! command -v node &> /dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt install -y nodejs
-fi
+mysql -u root << 'MYSQL_SQL'
+CREATE DATABASE IF NOT EXISTS alany_host CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'alany_user'@'localhost' IDENTIFIED BY 'AlanyHost2026Pass!';
+GRANT ALL PRIVILEGES ON alany_host.* TO 'alany_user'@'localhost';
+ALTER USER 'alany_user'@'localhost' IDENTIFIED BY 'AlanyHost2026Pass!';
+FLUSH PRIVILEGES;
+MYSQL_SQL
 
-npm install -g pm2
+echo -e "${GREEN}[УСПЕХ] База данных alany_host и пользователь alany_user успешно настроены!${NC}"
 
-# 4. Настройка MariaDB / MySQL & phpMyAdmin
-echo -e "${YELLOW}[3/7] Конфигурация MySQL (MariaDB) для панели и phpMyAdmin...${NC}"
-systemctl start mariadb || systemctl start mysql || true
-systemctl enable mariadb || systemctl enable mysql || true
-
-mysql -e "CREATE DATABASE IF NOT EXISTS alany_host CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || true
-mysql -e "CREATE USER IF NOT EXISTS 'alany_user'@'localhost' IDENTIFIED BY 'AlanyHost2026Pass!';" || true
-mysql -e "GRANT ALL PRIVILEGES ON alany_host.* TO 'alany_user'@'localhost';" || true
-mysql -e "FLUSH PRIVILEGES;" || true
-
-export DEBIAN_FRONTEND=noninteractive
-echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | debconf-set-selections
-echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect nginx" | debconf-set-selections
-apt install -y phpmyadmin php-fpm php-mysql php-mbstring php-zip php-gd
-
-# 5. Разворачивание репозитория панели Alany Host
-echo -e "${YELLOW}[4/7] Клонирование и сборка Alany Host...${NC}"
+# 4. Подготовка директорий и разворачивание репозитория
+echo -e "${YELLOW}[3/7] Подготовка рабочей директории ${INSTALL_DIR}...${NC}"
 mkdir -p /var/www
+mkdir -p /var/lib/alany-servers
+chmod -R 777 /var/lib/alany-servers
+
 if [ -d "$INSTALL_DIR" ]; then
   echo "Директория $INSTALL_DIR уже существует. Обновляем файлы..."
   cd "$INSTALL_DIR"
   git pull || true
 else
-  # Если передан аргумент с URL гитхаба: bash install.sh https://github.com/user/repo.git
-  GITHUB_REPO=${1:-"https://github.com/alany-host/alany-host.git"}
+  GITHUB_REPO=${1:-"https://github.com/aslanbostanov23-lab/alany-host.git"}
   echo "Клонирование репозитория: $GITHUB_REPO"
   git clone "$GITHUB_REPO" "$INSTALL_DIR" || mkdir -p "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
 
-# Установка зависимостей бэкенда
-echo "Установка зависимостей бэкенда..."
-cd backend
-npm install
-cd ..
+# 5. Установка Node.js и PM2 (если не установлены)
+if ! command -v node &> /dev/null; then
+  echo "Установка Node.js..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+fi
 
-# Сборка фронтенда
-echo "Сборка фронтенда React (Vite)..."
-cd frontend
+npm install -g pm2 || true
+
+# 6. Установка зависимостей бэкенда и сборка фронтенда
+echo -e "${YELLOW}[4/7] Установка NPM пакетов и сборка проекта...${NC}"
+cd "$INSTALL_DIR/backend"
+npm install
+
+cd "$INSTALL_DIR/frontend"
 npm install
 npm run build
 chmod -R 755 dist || true
 chmod -R 755 .. || true
-cd ..
 
-# 6. Конфигурация Nginx под cloud.alany.ru + phpMyAdmin
-echo -e "${YELLOW}[5/7] Конфигурация веб-сервера Nginx под ${DOMAIN}...${NC}"
+cd "$INSTALL_DIR"
 
-# Определяем реальный путь к PHP-FPM сокету на этой ОС
+# 7. Автоматическое определение PHP-FPM сокета и конфигурация Nginx + SSL
+echo -e "${YELLOW}[5/7] Настройка Nginx и phpMyAdmin под ${DOMAIN}...${NC}"
+
 PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
 if [ -z "$PHP_SOCK" ]; then
     PHP_SOCK="unix:/run/php/php-fpm.sock"
 else
     PHP_SOCK="unix:${PHP_SOCK}"
 fi
-echo "Найден PHP-FPM сокет: $PHP_SOCK"
 
-# Генерируем Nginx конфиг с подставленным сокетом
 cat > /etc/nginx/sites-available/alany-host <<NGINXEOF
 server {
     listen 80;
-    server_name cloud.alany.ru;
+    server_name ${DOMAIN};
 
-    root /var/www/alany-host/frontend/dist;
+    root ${INSTALL_DIR}/frontend/dist;
     index index.html;
 
     client_max_body_size 100M;
@@ -150,38 +135,27 @@ NGINXEOF
 rm -f /etc/nginx/sites-enabled/*
 rm -f /etc/nginx/sites-available/default
 ln -sf /etc/nginx/sites-available/alany-host /etc/nginx/sites-enabled/alany-host
+
 nginx -t || true
 systemctl restart nginx || true
 systemctl restart php*-fpm || true
+
+# Выпуск SSL сертификата через Certbot
 if command -v certbot &> /dev/null; then
-  certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email -d "${DOMAIN}" || {
-    echo -e "${YELLOW}[ИНФО] Если домен ${DOMAIN} еще не направлен на этот IP, SSL активируется автоматически при привязке A-записи.${NC}"
-  }
+  certbot --nginx --non-interactive --agree-tos --register-unsafely-without-email -d "${DOMAIN}" || true
 fi
 
-# 8. Автозапуск бэкенда через PM2
-echo -e "${YELLOW}[7/7] Запуск бэкенда Alany Host через PM2...${NC}"
-cd "$INSTALL_DIR"
-pm2 start ecosystem.config.js || pm2 start backend/server.js --name "alany-host"
-pm2 save
-pm2 startup | tail -n 1 | bash || true
+# 8. Запуск бэкенда Alany Host через PM2 в режиме MySQL
+echo -e "${YELLOW}[6/7] Запуск бэкенда через PM2...${NC}"
+pm2 kill || true
+pm2 start ecosystem.config.js
+pm2 save || true
 
-# 9. Финальная оптимизация и вывод данных
-echo -e "${GREEN}"
-echo "=============================================================================="
-echo "  [УСПЕХ] Панель управления ALANY > HOST успешно установлена!"
-echo "=============================================================================="
-echo -e "${NC}"
-echo -e "🔗 Адрес панели (HTTPS): ${CYAN}https://${DOMAIN}/${NC}"
-echo -e "🗄️  БД phpMyAdmin:        ${CYAN}https://${DOMAIN}/phpmyadmin${NC}"
-echo -e "👤 Администратор:        ${YELLOW}admin${NC} / Пароль: ${YELLOW}admin${NC}"
-echo -e "👥 Пользователь:         ${YELLOW}user${NC} / Пароль: ${YELLOW}user${NC}"
-echo "=============================================================================="
-echo -e "🔗 Адрес панели:        ${CYAN}http://cloud.alany.ru/${NC}"
-echo -e "🗄️  БД phpMyAdmin:      ${CYAN}http://cloud.alany.ru/phpmyadmin${NC}"
-echo -e "👤 Демо Администратор: ${YELLOW}admin${NC} / Пароль: ${YELLOW}admin${NC}"
-echo -e "👥 Демо Пользователь:  ${YELLOW}user${NC} / Пароль: ${YELLOW}user${NC}"
-echo ""
-echo -e "${BLUE}Для выпуска бесплатного SSL-сертификата HTTPS выполните:${NC}"
-echo -e "${CYAN}certbot --nginx -d cloud.alany.ru${NC}"
-echo "=============================================================================="
+echo -e "${GREEN}======================================================================${NC}"
+echo -e "${GREEN}        Установка Alany Host успешно завершена!                      ${NC}"
+echo -e "${BLUE}  Панель управления:  https://${DOMAIN}/                             ${NC}"
+echo -e "${BLUE}  База данных (PMA):  https://${DOMAIN}/phpmyadmin/                 ${NC}"
+echo -e "${BLUE}  Логин PMA:          alany_user                                     ${NC}"
+echo -e "${BLUE}  Пароль PMA:         AlanyHost2026Pass!                             ${NC}"
+echo -e "${BLUE}  Админ панели:       admin / admin                                  ${NC}"
+echo -e "${GREEN}======================================================================${NC}"
